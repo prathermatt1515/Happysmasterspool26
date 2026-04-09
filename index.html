@@ -184,7 +184,9 @@ async function fetchScores() {
         const isWD = st === "wd" || st === "withdrawn";
         const rounds = (c.linescores || []).map(ls => ls.value ? parseInt(ls.value) : null);
         const toParStr = c.statistics?.[0]?.displayValue || "E";
-        players[n] = { name:n, position:c.order||999, displayPos:c.status?.position?.displayName||(isMC?"MC":(isWD?"WD":"")), totalScore:c.score?parseInt(c.score):null, toParStr, rounds, isMC, isWD };
+        const thru = c.status?.thru || c.status?.displayThru || "";
+        const today = c.statistics?.[1]?.displayValue || "";
+        players[n] = { name:n, position:c.order||999, displayPos:c.status?.position?.displayName||(isMC?"MC":(isWD?"WD":"")), totalScore:c.score?parseInt(c.score):null, toParStr, rounds, isMC, isWD, thru, today };
       });
       const status = evt.status?.type?.name || "pre";
       const round = evt.status?.period || 0;
@@ -213,12 +215,12 @@ function getPlayerScore(pickName) {
 
 function getPlayerRoundScores(pickName) {
   const p = getPlayerScore(pickName);
-  if (!p) return { r1:null,r2:null,r3:null,r4:null,total:null,isMC:false,found:false,toParStr:"—",displayPos:"" };
+  if (!p) return { r1:null,r2:null,r3:null,r4:null,total:null,isMC:false,found:false,toParStr:"—",displayPos:"",thru:"",today:"" };
   const r1 = p.rounds[0]||null, r2 = p.rounds[1]||null;
   const r3 = (p.isMC||p.isWD) ? MC_SCORE : (p.rounds[2]||null);
   const r4 = (p.isMC||p.isWD) ? MC_SCORE : (p.rounds[3]||null);
   const vals = [r1,r2,r3,r4].filter(v=>v!==null);
-  return { r1,r2,r3,r4, total:vals.length>0?vals.reduce((a,b)=>a+b,0):null, isMC:p.isMC||p.isWD, found:true, toParStr:p.isMC?"MC":(p.isWD?"WD":p.toParStr), displayPos:p.displayPos };
+  return { r1,r2,r3,r4, total:vals.length>0?vals.reduce((a,b)=>a+b,0):null, isMC:p.isMC||p.isWD, found:true, toParStr:p.isMC?"MC":(p.isWD?"WD":p.toParStr), displayPos:p.displayPos, thru:p.thru||"", today:p.today||"" };
 }
 
 function calcPoolStandings() {
@@ -311,7 +313,7 @@ function renderPoolStandings() {
     html += '<div class="entry-card'+(isLeader?' leader':'')+'">';
     html += '<div class="entry-header"><span class="entry-rank">'+(r.total!==null?i+1:"—")+'</span><span class="entry-name">'+r.name+'</span><span class="entry-total">'+(r.total!==null?r.total:"—")+'</span></div>';
     html += '<div class="subtotals"><span>R1+R2 (all 6): <strong>'+(r.r1r2Total!==null?r.r1r2Total:"—")+'</strong></span><span>R3 (top 4): <strong>'+(r.r3Total!==null?r.r3Total:"—")+'</strong></span><span>R4 (top 4): <strong>'+(r.r4Total!==null?r.r4Total:"—")+'</strong></span></div>';
-    html += '<div style="padding:8px 12px"><table class="golfer-table"><thead><tr><th class="left">Golfer</th><th>Tier</th><th>Par</th><th>R1</th><th>R2</th><th>R3</th><th>R4</th><th>Total</th></tr></thead><tbody>';
+    html += '<div style="padding:8px 12px"><table class="golfer-table"><thead><tr><th class="left">Golfer</th><th>Tier</th><th>Score</th><th>Thru</th><th>R1</th><th>R2</th><th>R3</th><th>R4</th><th>Tot</th></tr></thead><tbody>';
     r.picks.forEach(p => {
       const dropped = !p.advancing;
       const cls = dropped ? "dropped" : "counting";
@@ -319,6 +321,7 @@ function renderPoolStandings() {
       html += '<td style="color:rgba(250,246,237,0.35);font-size:11px">T'+p.tier+'</td>';
       var parClr = !p.toParStr||p.toParStr==='—'?'rgba(250,246,237,0.5)':p.toParStr==='MC'?'rgba(250,246,237,0.3)':p.toParStr==='E'?'var(--cream)':p.toParStr.startsWith('-')?'#2ecc71':'#e67e22';
       html += '<td style="font-size:11px;font-weight:600;color:'+parClr+'">'+(dropped?'—':(p.toParStr||'—'))+'</td>';
+      html += '<td style="font-size:10px;color:rgba(250,246,237,0.4);text-align:center">'+(dropped?'—':(p.thru||'—'))+'</td>';
       html += '<td class="counting">'+(p.r1!==null?p.r1:"—")+'</td>';
       html += '<td class="counting">'+(p.r2!==null?p.r2:"—")+'</td>';
       html += '<td class="'+(dropped?'dropped':'counting')+'">'+(dropped?"—":(p.r3!==null?p.r3:"—"))+'</td>';
@@ -335,12 +338,13 @@ function renderPoolStandings() {
 function renderMastersBoard() {
   if (!scores) return '<p style="text-align:center;color:rgba(250,246,237,0.4);padding:40px;line-height:1.8">The <strong style="color:var(--gold)">2026 Masters</strong> begins <strong style="color:var(--gold)">Thursday, April 9</strong>.<br>Live scores will appear here automatically.</p>';
   const board = Object.values(scores).sort((a,b)=>a.position-b.position);
-  let html = '<h2 style="color:var(--gold);font-size:21px;margin-bottom:14px">⛳ Masters Leaderboard</h2><div style="overflow-x:auto"><table style="min-width:500px"><thead><tr><th class="left">Pos</th><th class="left">Player</th><th>To Par</th><th>Total</th><th>R1</th><th>R2</th><th>R3</th><th>R4</th></tr></thead><tbody>';
+  let html = '<h2 style="color:var(--gold);font-size:21px;margin-bottom:14px">⛳ Masters Leaderboard</h2><div style="overflow-x:auto"><table style="min-width:500px"><thead><tr><th class="left">Pos</th><th class="left">Player</th><th>Score</th><th>Today</th><th>Thru</th><th>R1</th><th>R2</th><th>R3</th><th>R4</th><th>Tot</th></tr></thead><tbody>';
   board.forEach(p => {
     const parCls = p.isMC?'par-mc':p.toParStr?.startsWith('-')?'par-neg':p.toParStr?.startsWith('+')?'par-pos':'par-even';
-    html += '<tr><td class="left" style="font-weight:700;color:var(--gold)">'+(p.displayPos||p.position)+'</td><td class="left" style="font-weight:600;color:var(--gold-light)">'+p.name+'</td><td class="'+parCls+'">'+(p.isMC?'MC':p.isWD?'WD':(p.toParStr||"—"))+'</td><td>'+(p.totalScore||"—")+'</td>';
+    var todayClr = !p.today||p.today==='E'?'var(--cream)':p.today.startsWith('-')?'#2ecc71':'#e67e22';
+    html += '<tr><td class="left" style="font-weight:700;color:var(--gold)">'+(p.displayPos||p.position)+'</td><td class="left" style="font-weight:600;color:var(--gold-light)">'+p.name+'</td><td class="'+parCls+'">'+(p.isMC?'MC':p.isWD?'WD':(p.toParStr||"—"))+'</td><td style="color:'+todayClr+';font-weight:600">'+(p.today||"—")+'</td><td style="font-size:12px;color:rgba(250,246,237,0.5)">'+(p.thru||"—")+'</td>';
     for (let r=0;r<4;r++) html += '<td>'+(p.rounds[r]||"—")+'</td>';
-    html += '</tr>';
+    html += '<td style="font-weight:600">'+(p.totalScore||"—")+'</td></tr>';
   });
   html += '</tbody></table></div>';
   return html;
