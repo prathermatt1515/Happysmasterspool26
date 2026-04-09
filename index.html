@@ -218,7 +218,7 @@ function getPlayerRoundScores(pickName) {
   const r3 = (p.isMC||p.isWD) ? MC_SCORE : (p.rounds[2]||null);
   const r4 = (p.isMC||p.isWD) ? MC_SCORE : (p.rounds[3]||null);
   const vals = [r1,r2,r3,r4].filter(v=>v!==null);
-  return { r1,r2,r3,r4, total:vals.length>0?vals.reduce((a,b)=>a+b,0):null, isMC:p.isMC||p.isWD, found:true, toParStr:p.isMC?"MC":(p.isWD?"WD":p.toParStr), displayPos:p.displayPos };
+  return { r1,r2,r3,r4, total:vals.length>0?vals.reduce((a,b)=>a+b,0):null, isMC:p.isMC||p.isWD, found:true, toParStr:p.isMC?"MC":(p.isWD?"WD":p.toParStr), displayPos:p.displayPos, toPar:p.toParStr };
 }
 
 function calcPoolStandings() {
@@ -300,7 +300,16 @@ function renderPoolStandings() {
     const borders = ["gold-border","silver-border","bronze-border"];
     html += '<div class="podium">';
     top3.forEach((r,i) => {
-      html += '<div class="podium-card '+borders[i]+'"><div style="font-size:28px;margin-bottom:4px">'+medals[i]+'</div><div style="font-size:16px;font-weight:700;color:'+colors[i]+';margin-bottom:4px">'+r.name+'</div><div style="font-size:24px;font-weight:900;color:'+colors[i]+'">'+r.total+'</div></div>';
+      var pPar = null;
+      var pCounted = 0;
+      r.picks.forEach(function(p) {
+        if (p.r1!==null) pCounted++;
+        if (p.r2!==null) pCounted++;
+        if (p.advancing) { if(p.r3!==null) pCounted++; if(p.r4!==null) pCounted++; }
+      });
+      pPar = r.total - (pCounted * 72);
+      var pParStr = pPar===0?'E':pPar>0?'+'+pPar:''+pPar;
+      html += '<div class="podium-card '+borders[i]+'"><div style="font-size:28px;margin-bottom:4px">'+medals[i]+'</div><div style="font-size:16px;font-weight:700;color:'+colors[i]+';margin-bottom:4px">'+r.name+'</div><div style="font-size:24px;font-weight:900;color:'+colors[i]+'">'+r.total+'</div><div style="font-size:14px;color:'+colors[i]+';opacity:0.8">'+pParStr+'</div></div>';
     });
     html += '</div>';
   }
@@ -309,14 +318,33 @@ function renderPoolStandings() {
   standings.forEach((r, i) => {
     const isLeader = i===0 && r.total!==null;
     html += '<div class="entry-card'+(isLeader?' leader':'')+'">';
-    html += '<div class="entry-header"><span class="entry-rank">'+(r.total!==null?i+1:"—")+'</span><span class="entry-name">'+r.name+'</span><span class="entry-total">'+(r.total!==null?r.total:"—")+'</span></div>';
+    var teamPar = null;
+    if (r.total !== null) {
+      // Calculate team to-par: sum advancing golfers' toPar values
+      // Par at Augusta = 72 per round. Team par depends on how many golfer-rounds counted
+      var countedRounds = 0;
+      r.picks.forEach(function(p) {
+        if (p.r1 !== null) countedRounds++;
+        if (p.r2 !== null) countedRounds++;
+        if (p.advancing) {
+          if (p.r3 !== null) countedRounds++;
+          if (p.r4 !== null) countedRounds++;
+        }
+      });
+      teamPar = r.total - (countedRounds * 72);
+    }
+    var teamParStr = teamPar === null ? '' : (teamPar === 0 ? ' (E)' : (teamPar > 0 ? ' (+'+teamPar+')' : ' ('+teamPar+')'));
+    var teamParClr = teamPar === null ? '' : teamPar < 0 ? '#2ecc71' : teamPar > 0 ? '#e67e22' : 'var(--cream)';
+    html += '<div class="entry-header"><span class="entry-rank">'+(r.total!==null?i+1:"—")+'</span><span class="entry-name">'+r.name+'</span><span class="entry-total">'+(r.total!==null?r.total:"—")+'<span style="font-size:14px;color:'+teamParClr+';margin-left:8px">'+teamParStr+'</span></span></div>';
     html += '<div class="subtotals"><span>R1+R2 (all 6): <strong>'+(r.r1r2Total!==null?r.r1r2Total:"—")+'</strong></span><span>R3 (top 4): <strong>'+(r.r3Total!==null?r.r3Total:"—")+'</strong></span><span>R4 (top 4): <strong>'+(r.r4Total!==null?r.r4Total:"—")+'</strong></span></div>';
-    html += '<div style="padding:8px 12px"><table class="golfer-table"><thead><tr><th class="left">Golfer</th><th>Tier</th><th>R1</th><th>R2</th><th>R3</th><th>R4</th><th>Total</th></tr></thead><tbody>';
+    html += '<div style="padding:8px 12px"><table class="golfer-table"><thead><tr><th class="left">Golfer</th><th>Tier</th><th>Par</th><th>R1</th><th>R2</th><th>R3</th><th>R4</th><th>Total</th></tr></thead><tbody>';
     r.picks.forEach(p => {
       const dropped = !p.advancing;
       const cls = dropped ? "dropped" : "counting";
       html += '<tr style="opacity:'+(dropped?'0.5':'1')+'"><td class="left" style="font-weight:'+(dropped?'400':'600')+';color:'+(dropped?'rgba(250,246,237,0.25)':'var(--gold-light)')+';font-style:'+(p.isMC?'italic':'normal')+'">'+p.player+(p.isMC&&p.advancing?' (MC)':'')+(dropped?' ✂':'')+'</td>';
       html += '<td style="color:rgba(250,246,237,0.35);font-size:11px">T'+p.tier+'</td>';
+      var parClr = !p.toPar||p.toPar==='—'?'rgba(250,246,237,0.5)':p.toPar==='MC'?'rgba(250,246,237,0.3)':p.toPar==='E'?'var(--cream)':p.toPar.startsWith('-')?'#2ecc71':'#e67e22';
+      html += '<td style="font-size:11px;font-weight:600;color:'+parClr+'">'+(dropped?'—':(p.toPar||'—'))+'</td>';
       html += '<td class="counting">'+(p.r1!==null?p.r1:"—")+'</td>';
       html += '<td class="counting">'+(p.r2!==null?p.r2:"—")+'</td>';
       html += '<td class="'+(dropped?'dropped':'counting')+'">'+(dropped?"—":(p.r3!==null?p.r3:"—"))+'</td>';
