@@ -182,24 +182,26 @@ async function fetchScores() {
         const st = c.status?.type?.name || "";
         const isMC = st === "cut";
         const isWD = st === "wd" || st === "withdrawn";
-        const rounds = (c.linescores || []).map(ls => ls.value ? parseInt(ls.value) : null);
-        let toParStr = "E";
-        try {
-          const stats = c.statistics || [];
-          let raw = "";
-          // Try displayValue first
-          if (stats.length > 0 && stats[0].displayValue) raw = stats[0].displayValue.toString().trim();
-          // If empty, try value field
-          if (!raw && stats.length > 0 && stats[0].value !== undefined) {
-            const v = parseFloat(stats[0].value);
-            if (!isNaN(v)) raw = v > 0 ? "+" + v : (v === 0 ? "E" : "" + v);
+        // c.score is the to-par string like "-5", "+3", "E"
+        let toParStr = c.score || "E";
+        if (toParStr === "0") toParStr = "E";
+        else if (!toParStr.startsWith("-") && !toParStr.startsWith("+") && toParStr !== "E") {
+          const num = parseInt(toParStr);
+          if (!isNaN(num)) toParStr = num > 0 ? "+" + num : (num === 0 ? "E" : "" + num);
+        }
+        // linescores: array of round objects. Each has .value (strokes) and nested .linescores (holes)
+        const rounds = [];
+        const ls = c.linescores || [];
+        for (let i = 0; i < 4; i++) {
+          if (ls[i] && ls[i].value) {
+            const v = parseInt(ls[i].value);
+            rounds.push((v >= 60 && v <= 120) ? v : null);
+          } else {
+            rounds.push(null);
           }
-          if (!raw || raw === "0") toParStr = "E";
-          else if (raw === "E") toParStr = "E";
-          else if (raw.startsWith("-") || raw.startsWith("+")) toParStr = raw;
-          else { const num = parseInt(raw); if (!isNaN(num)) toParStr = num > 0 ? "+" + num : (num === 0 ? "E" : "" + num); else toParStr = raw; }
-        } catch(e) { toParStr = "E"; }
-        players[n] = { name:n, position:c.order||999, displayPos:c.status?.position?.displayName||(isMC?"MC":(isWD?"WD":"")), totalScore:c.score?parseInt(c.score):null, toParStr, rounds, isMC, isWD };
+        }
+        const totalStrokes = rounds.filter(v => v !== null).reduce((a, b) => a + b, 0) || null;
+        players[n] = { name:n, position:c.order||999, displayPos:c.status?.position?.displayName||(isMC?"MC":(isWD?"WD":"")), totalScore:totalStrokes, toParStr, rounds, isMC, isWD };
       });
       const status = evt.status?.type?.name || "pre";
       const round = evt.status?.period || 0;
