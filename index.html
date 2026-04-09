@@ -195,7 +195,7 @@ async function fetchScores() {
         for (let i = 0; i < 4; i++) {
           if (ls[i] && ls[i].value) {
             const v = parseInt(ls[i].value);
-            rounds.push((v >= 60 && v <= 120) ? v : null);
+            rounds.push(v);
           } else {
             rounds.push(null);
           }
