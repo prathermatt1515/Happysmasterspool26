@@ -197,14 +197,15 @@ async function fetchScores() {
   }
 }
 
+function normName(s) { return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); }
 function getPlayerScore(pickName) {
   if (!scores) return null;
   if (scores[pickName]) return scores[pickName];
-  const pLast = pickName.split(" ").pop().toLowerCase();
-  const pFirst = pickName.split(" ")[0].toLowerCase();
+  const pLast = normName(pickName.split(" ").pop());
+  const pFirst = normName(pickName.split(" ")[0]);
   for (const [espn, data] of Object.entries(scores)) {
-    const eLast = espn.split(" ").pop().toLowerCase();
-    const eFirst = espn.split(" ")[0].toLowerCase();
+    const eLast = normName(espn.split(" ").pop());
+    const eFirst = normName(espn.split(" ")[0]);
     if (eLast === pLast && eFirst[0] === pFirst[0]) return data;
   }
   return null;
