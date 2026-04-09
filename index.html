@@ -182,11 +182,30 @@ async function fetchScores() {
         const st = c.status?.type?.name || "";
         const isMC = st === "cut";
         const isWD = st === "wd" || st === "withdrawn";
-        const rounds = (c.linescores || []).map(ls => ls.value ? parseInt(ls.value) : null);
-        const toParStr = c.statistics?.[0]?.displayValue || "E";
-        const thru = c.status?.thru || c.status?.displayThru || "";
-        const today = c.statistics?.[1]?.displayValue || "";
-        players[n] = { name:n, position:c.order||999, displayPos:c.status?.position?.displayName||(isMC?"MC":(isWD?"WD":"")), totalScore:c.score?parseInt(c.score):null, toParStr, rounds, isMC, isWD, thru, today };
+        const rawLinescores = c.linescores || [];
+        // During live play, linescores may be hole-by-hole (18+ entries). 
+        // Round scores only when <= 4 entries with values in golf range (60-90).
+        let rounds = [null, null, null, null];
+        if (rawLinescores.length <= 4) {
+          rounds = rawLinescores.map(ls => {
+            const v = ls.value ? parseInt(ls.value) : null;
+            return (v && v >= 60 && v <= 120) ? v : null;
+          });
+          while (rounds.length < 4) rounds.push(null);
+        }
+        // Get to-par from statistics
+        let toParStr = "E";
+        let today = "";
+        const stats = c.statistics || [];
+        for (const s of stats) {
+          if (s.name === "scoreToPar" || s.abbreviation === "SCORE") toParStr = s.displayValue || "E";
+          if (s.name === "vspar" || s.abbreviation === "TODAY") today = s.displayValue || "";
+        }
+        if (toParStr === "E" && stats.length > 0) toParStr = stats[0].displayValue || "E";
+        if (!today && stats.length > 1) today = stats[1].displayValue || "";
+        const thru = c.status?.thru ? (c.status.thru >= 18 ? "F" : c.status.thru.toString()) : "";
+        const totalScore = c.score ? parseInt(c.score) : null;
+        players[n] = { name:n, position:c.order||999, displayPos:c.status?.position?.displayName||(isMC?"MC":(isWD?"WD":"")), totalScore, toParStr, rounds, isMC, isWD, thru, today };
       });
       const status = evt.status?.type?.name || "pre";
       const round = evt.status?.period || 0;
@@ -215,12 +234,13 @@ function getPlayerScore(pickName) {
 
 function getPlayerRoundScores(pickName) {
   const p = getPlayerScore(pickName);
-  if (!p) return { r1:null,r2:null,r3:null,r4:null,total:null,isMC:false,found:false,toParStr:"—",displayPos:"",thru:"",today:"" };
+  if (!p) return { r1:null,r2:null,r3:null,r4:null,total:null,isMC:false,found:false,toParStr:"—",displayPos:"",thru:"",today:"",totalScore:null };
   const r1 = p.rounds[0]||null, r2 = p.rounds[1]||null;
   const r3 = (p.isMC||p.isWD) ? MC_SCORE : (p.rounds[2]||null);
   const r4 = (p.isMC||p.isWD) ? MC_SCORE : (p.rounds[3]||null);
   const vals = [r1,r2,r3,r4].filter(v=>v!==null);
-  return { r1,r2,r3,r4, total:vals.length>0?vals.reduce((a,b)=>a+b,0):null, isMC:p.isMC||p.isWD, found:true, toParStr:p.isMC?"MC":(p.isWD?"WD":p.toParStr), displayPos:p.displayPos, thru:p.thru||"", today:p.today||"" };
+  const total = vals.length>0 ? vals.reduce((a,b)=>a+b,0) : null;
+  return { r1,r2,r3,r4, total, isMC:p.isMC||p.isWD, found:true, toParStr:p.isMC?"MC":(p.isWD?"WD":p.toParStr), displayPos:p.displayPos, thru:p.thru||"", today:p.today||"", totalScore:p.totalScore };
 }
 
 function calcPoolStandings() {
