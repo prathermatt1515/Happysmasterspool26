@@ -120,7 +120,7 @@ const TIERS = [
   { name: "Tier 6", players: ["K. Kitayama","N. Hojgaard","R. Fox","A. Rai","H. Hall","J. Keefer","R. Neergaard-Peterson","T. McKibbin","S. Stevens","B. Harman","R. Hojgaard","C. Ortiz","N. Echavarria","A. Novak","M. Kim","C. Jarvis","A. Potgieter","M. Greyserman","N. Taylor","Hao-Tong Li","B. Watson","K. Reitan","S. Valimaki","D. Riley","C. Schwartzel","M. Brennen","B. Campbell","Z. Johnson","D. Willett","A. Cabrera","M. Weir","V. Singh","F. Couples","B. Holtz","E. Fang","J. Harrington","M. Howell","N. Kataoka","M. Pulcini","F. Laopakdee","J.M. Olazabal"] }
 ];
 const MC_SCORE = 80;
-const TOURNEY_START = new Date("2026-04-09T07:25:00-04:00");
+const TOURNEY_START = new Date("2026-04-01T00:00:00Z");
 const ESPN_URLS = [
   "https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard",
   "https://corsproxy.io/?"+encodeURIComponent("https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard"),
@@ -206,9 +206,6 @@ function getPlayerScore(pickName) {
     const eLast = espn.split(" ").pop().toLowerCase();
     const eFirst = espn.split(" ")[0].toLowerCase();
     if (eLast === pLast && eFirst[0] === pFirst[0]) return data;
-  }
-  for (const [espn, data] of Object.entries(scores)) {
-    if (espn.split(" ").pop().toLowerCase() === pLast) return data;
   }
   return null;
 }
