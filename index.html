@@ -197,7 +197,7 @@ async function fetchScores() {
   }
 }
 
-function normName(s) { return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); }
+function normName(s) { return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ø/g,"o").replace(/Ø/g,"O").replace(/æ/g,"ae").replace(/Æ/g,"AE").replace(/ð/g,"d").replace(/ß/g,"ss").toLowerCase(); }
 function getPlayerScore(pickName) {
   if (!scores) return null;
   if (scores[pickName]) return scores[pickName];
