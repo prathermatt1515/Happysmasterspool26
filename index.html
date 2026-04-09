@@ -184,13 +184,21 @@ async function fetchScores() {
         const isWD = st === "wd" || st === "withdrawn";
         const rounds = (c.linescores || []).map(ls => ls.value ? parseInt(ls.value) : null);
         let toParStr = "E";
-        if (c.statistics && c.statistics.length > 0) {
-          const raw = c.statistics[0].displayValue;
-          if (raw === "0" || raw === "E" || !raw) toParStr = "E";
-          else if (raw.startsWith("-")) toParStr = raw;
-          else if (raw.startsWith("+")) toParStr = raw;
-          else toParStr = "+" + raw;
-        }
+        try {
+          const stats = c.statistics || [];
+          let raw = "";
+          // Try displayValue first
+          if (stats.length > 0 && stats[0].displayValue) raw = stats[0].displayValue.toString().trim();
+          // If empty, try value field
+          if (!raw && stats.length > 0 && stats[0].value !== undefined) {
+            const v = parseFloat(stats[0].value);
+            if (!isNaN(v)) raw = v > 0 ? "+" + v : (v === 0 ? "E" : "" + v);
+          }
+          if (!raw || raw === "0") toParStr = "E";
+          else if (raw === "E") toParStr = "E";
+          else if (raw.startsWith("-") || raw.startsWith("+")) toParStr = raw;
+          else { const num = parseInt(raw); if (!isNaN(num)) toParStr = num > 0 ? "+" + num : (num === 0 ? "E" : "" + num); else toParStr = raw; }
+        } catch(e) { toParStr = "E"; }
         players[n] = { name:n, position:c.order||999, displayPos:c.status?.position?.displayName||(isMC?"MC":(isWD?"WD":"")), totalScore:c.score?parseInt(c.score):null, toParStr, rounds, isMC, isWD };
       });
       const status = evt.status?.type?.name || "pre";
