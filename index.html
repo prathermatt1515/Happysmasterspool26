@@ -265,7 +265,6 @@ function calcPoolStandings() {
     const r2Complete = pickData.filter(p=>p.r2!==null).length >= 4;
     let r3Total=0,r3Has=false,r4Total=0,r4Has=false;
     pickData.forEach(p => {
-      p.r1Counting=true; p.r2Counting=true;
       p.advancing = r2Complete ? advancingNames.has(p.player) : true;
       p.r3Counting=p.advancing; p.r4Counting=p.advancing;
       if (p.advancing) {
