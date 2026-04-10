@@ -81,7 +81,7 @@ footer { text-align: center; padding: 32px 16px 0; color: rgba(250,246,237,0.2);
       <h2>How It Works</h2>
       <p><strong>Pick one golfer from each of the 6 tiers.</strong></p>
       <ul>
-        <li><strong>Rounds 1 & 2:</strong> All 6 of your golfers count toward your team total.</li>
+        <li><strong>Rounds 1 & 2:</strong> Your best 4 of 6 golfer scores count each round.</li>
         <li><strong>Rounds 3 & 4:</strong> Your best 4 golfers (by R1+R2 combined) advance. Bottom 2 are dropped.</li>
         <li><strong>Missed Cut:</strong> Any advancing golfer who misses the cut scores 80 per round for R3 & R4.</li>
       </ul>
@@ -243,10 +243,22 @@ function calcPoolStandings() {
   const all = getAllEntries();
   return all.map(entry => {
     const pickData = entry.picks.map((player, ti) => ({ player, tier:ti+1, ...getPlayerRoundScores(player) }));
-    let r1r2Total = 0, r1r2Has = false;
+    // R1: best 4 of 6 scores count
+    const r1Scores = pickData.filter(p => p.r1 !== null).map(p => ({player:p.player, score:p.r1, tier:p.tier})).sort((a,b) => a.score - b.score || a.tier - b.tier);
+    const r1Best4 = new Set(r1Scores.slice(0, 4).map(x => x.player));
+    const r1Total = r1Scores.slice(0, 4).reduce((s, x) => s + x.score, 0);
+    const r1Has = r1Scores.length > 0;
+    // R2: best 4 of 6 scores count
+    const r2Scores = pickData.filter(p => p.r2 !== null).map(p => ({player:p.player, score:p.r2, tier:p.tier})).sort((a,b) => a.score - b.score || a.tier - b.tier);
+    const r2Best4 = new Set(r2Scores.slice(0, 4).map(x => x.player));
+    const r2Total = r2Scores.slice(0, 4).reduce((s, x) => s + x.score, 0);
+    const r2Has = r2Scores.length > 0;
+    const r1r2Total = (r1Has ? r1Total : 0) + (r2Has ? r2Total : 0);
+    const r1r2Has = r1Has || r2Has;
+    // Mark R1/R2 counting status
     pickData.forEach(p => {
-      if (p.r1 !== null) { r1r2Total += p.r1; r1r2Has = true; }
-      if (p.r2 !== null) { r1r2Total += p.r2; r1r2Has = true; }
+      p.r1Counting = r1Best4.has(p.player);
+      p.r2Counting = r2Best4.has(p.player);
     });
     const r1r2Ranked = pickData.map(p => ({ player:p.player, tier:p.tier, r1r2:(p.r1!==null?p.r1:999)+(p.r2!==null?p.r2:999), hasR2:p.r1!==null&&p.r2!==null })).sort((a,b)=>a.r1r2-b.r1r2||a.tier-b.tier);
     const advancingNames = new Set(r1r2Ranked.slice(0,4).map(x=>x.player));
@@ -263,12 +275,25 @@ function calcPoolStandings() {
     });
     let grandTotal = null;
     if (r1r2Has||r3Has||r4Has) grandTotal = (r1r2Has?r1r2Total:0)+(r3Has?r3Total:0)+(r4Has?r4Total:0);
-    return { name:entry.name, picks:pickData, r1r2Total:r1r2Has?r1r2Total:null, r3Total:r3Has?r3Total:null, r4Total:r4Has?r4Total:null, total:grandTotal };
+    // Calculate team to-par from individual golfer scores
+      var countedStrokes = 0, countedRounds = 0;
+      pickData.forEach(function(p) {
+        if (p.r1 !== null && p.r1Counting) { countedStrokes += p.r1; countedRounds++; }
+        if (p.r2 !== null && p.r2Counting) { countedStrokes += p.r2; countedRounds++; }
+        if (p.advancing) {
+          if (p.r3 !== null) { countedStrokes += p.r3; countedRounds++; }
+          if (p.r4 !== null) { countedStrokes += p.r4; countedRounds++; }
+        }
+      });
+      var teamPar = countedRounds > 0 ? countedStrokes - (countedRounds * 72) : null;
+      var teamParCount = countedRounds;
+      var teamParStr = teamPar === null ? null : (teamPar === 0 ? 'E' : (teamPar > 0 ? '+' + teamPar : '' + teamPar));
+      return { name:entry.name, picks:pickData, r1r2Total:r1r2Has?r1r2Total:null, r3Total:r3Has?r3Total:null, r4Total:r4Has?r4Total:null, total:grandTotal, teamParStr:teamParStr, teamPar:teamParCount>0?teamPar:null };
   }).sort((a,b) => {
-    if (a.total===null&&b.total===null) return 0;
-    if (a.total===null) return 1;
-    if (b.total===null) return -1;
-    return a.total-b.total;
+    if (a.teamPar===null&&b.teamPar===null) return 0;
+    if (a.teamPar===null) return 1;
+    if (b.teamPar===null) return -1;
+    return a.teamPar-b.teamPar;
   });
 }
 
@@ -318,7 +343,8 @@ function renderPoolStandings() {
     const borders = ["gold-border","silver-border","bronze-border"];
     html += '<div class="podium">';
     top3.forEach((r,i) => {
-      html += '<div class="podium-card '+borders[i]+'"><div style="font-size:28px;margin-bottom:4px">'+medals[i]+'</div><div style="font-size:16px;font-weight:700;color:'+colors[i]+';margin-bottom:4px">'+r.name+'</div><div style="font-size:24px;font-weight:900;color:'+colors[i]+'">'+r.total+'</div></div>';
+      var podParClr = r.teamPar<0?'#2ecc71':r.teamPar>0?'#e67e22':colors[i];
+      html += '<div class="podium-card '+borders[i]+'"><div style="font-size:28px;margin-bottom:4px">'+medals[i]+'</div><div style="font-size:16px;font-weight:700;color:'+colors[i]+';margin-bottom:4px">'+r.name+'</div><div style="font-size:24px;font-weight:900;color:'+podParClr+'">'+(r.teamParStr||r.total)+'</div><div style="font-size:12px;color:rgba(250,246,237,0.4)">'+r.total+' strks</div></div>';
     });
     html += '</div>';
   }
@@ -327,8 +353,9 @@ function renderPoolStandings() {
   standings.forEach((r, i) => {
     const isLeader = i===0 && r.total!==null;
     html += '<div class="entry-card'+(isLeader?' leader':'')+'">';
-    html += '<div class="entry-header"><span class="entry-rank">'+(r.total!==null?i+1:"—")+'</span><span class="entry-name">'+r.name+'</span><span class="entry-total">'+(r.total!==null?r.total:"—")+'</span></div>';
-    html += '<div class="subtotals"><span>R1+R2 (all 6): <strong>'+(r.r1r2Total!==null?r.r1r2Total:"—")+'</strong></span><span>R3 (top 4): <strong>'+(r.r3Total!==null?r.r3Total:"—")+'</strong></span><span>R4 (top 4): <strong>'+(r.r4Total!==null?r.r4Total:"—")+'</strong></span></div>';
+    var parClrTeam = r.teamPar===null?'var(--gold)':r.teamPar<0?'#2ecc71':r.teamPar>0?'#e67e22':'var(--cream)';
+    html += '<div class="entry-header"><span class="entry-rank">'+(r.total!==null?i+1:"—")+'</span><span class="entry-name">'+r.name+'</span><span class="entry-total"><span style="color:'+parClrTeam+'">'+(r.teamParStr||"—")+'</span> <span style="font-size:14px;color:rgba(250,246,237,0.4);margin-left:6px">'+(r.total!==null?r.total+" strks":"")+'</span></span></div>';
+    html += '<div class="subtotals"><span>R1+R2 (best 4): <strong>'+(r.r1r2Total!==null?r.r1r2Total:"—")+'</strong></span><span>R3 (top 4): <strong>'+(r.r3Total!==null?r.r3Total:"—")+'</strong></span><span>R4 (top 4): <strong>'+(r.r4Total!==null?r.r4Total:"—")+'</strong></span></div>';
     html += '<div style="padding:8px 12px"><table class="golfer-table"><thead><tr><th class="left">Golfer</th><th>Tier</th><th>Score</th><th>R1</th><th>R2</th><th>R3</th><th>R4</th><th>Total</th></tr></thead><tbody>';
     r.picks.forEach(p => {
       const dropped = !p.advancing;
@@ -337,8 +364,10 @@ function renderPoolStandings() {
       html += '<td style="color:rgba(250,246,237,0.35);font-size:11px">T'+p.tier+'</td>';
       var parClr = !p.toParStr||p.toParStr==='—'?'rgba(250,246,237,0.5)':p.toParStr==='MC'?'rgba(250,246,237,0.3)':p.toParStr==='E'?'var(--cream)':p.toParStr.startsWith('-')?'#2ecc71':'#e67e22';
       html += '<td style="font-size:11px;font-weight:600;color:'+parClr+'">'+(dropped?'—':(p.toParStr||'—'))+'</td>';
-      html += '<td class="counting">'+(p.r1!==null?p.r1:"—")+'</td>';
-      html += '<td class="counting">'+(p.r2!==null?p.r2:"—")+'</td>';
+      var r1Drop = p.r1 !== null && !p.r1Counting;
+      var r2Drop = p.r2 !== null && !p.r2Counting;
+      html += '<td class="'+(r1Drop?'dropped':'counting')+'" style="'+(r1Drop?'text-decoration:line-through;opacity:0.5':'')+'">'+(p.r1!==null?p.r1:"—")+'</td>';
+      html += '<td class="'+(r2Drop?'dropped':'counting')+'" style="'+(r2Drop?'text-decoration:line-through;opacity:0.5':'')+'">'+(p.r2!==null?p.r2:"—")+'</td>';
       html += '<td class="'+(dropped?'dropped':'counting')+'">'+(dropped?"—":(p.r3!==null?p.r3:"—"))+'</td>';
       html += '<td class="'+(dropped?'dropped':'counting')+'">'+(dropped?"—":(p.r4!==null?p.r4:"—"))+'</td>';
       html += '<td style="font-weight:700;color:'+(dropped?'rgba(250,246,237,0.25)':'var(--gold)')+'">'+(dropped?"—":(p.total!==null?p.total:"—"))+'</td></tr>';
@@ -362,8 +391,8 @@ function renderPoolStandings() {
       // Also get all 6 for R1/R2
       r1Total = 0; r2Total = 0; r1Count = 0; r2Count = 0;
       r.picks.forEach(function(p) {
-        if (p.r1 !== null) { r1Total += p.r1; r1Count++; }
-        if (p.r2 !== null) { r2Total += p.r2; r2Count++; }
+        if (p.r1 !== null && p.r1Counting) { r1Total += p.r1; r1Count++; }
+        if (p.r2 !== null && p.r2Counting) { r2Total += p.r2; r2Count++; }
       });
       var scoreTotalStr = scoreCount > 0 ? (scoreTotal === 0 ? 'E' : (scoreTotal > 0 ? '+' + scoreTotal : '' + scoreTotal)) : '—';
       var scoreTotalClr = scoreTotal < 0 ? '#2ecc71' : scoreTotal > 0 ? '#e67e22' : 'var(--cream)';
