@@ -276,17 +276,17 @@ function calcPoolStandings() {
     let grandTotal = null;
     if (r1r2Has||r3Has||r4Has) grandTotal = (r1r2Has?r1r2Total:0)+(r3Has?r3Total:0)+(r4Has?r4Total:0);
     // Calculate team to-par from individual golfer scores
-      var countedStrokes = 0, countedRounds = 0;
+      var parValues = [];
       pickData.forEach(function(p) {
-        if (p.r1 !== null && p.r1Counting) { countedStrokes += p.r1; countedRounds++; }
-        if (p.r2 !== null && p.r2Counting) { countedStrokes += p.r2; countedRounds++; }
-        if (p.advancing) {
-          if (p.r3 !== null) { countedStrokes += p.r3; countedRounds++; }
-          if (p.r4 !== null) { countedStrokes += p.r4; countedRounds++; }
+        if (p.toParStr && p.toParStr !== '—' && p.toParStr !== 'MC' && p.found) {
+          var pv = p.toParStr === 'E' ? 0 : parseInt(p.toParStr);
+          if (!isNaN(pv)) parValues.push(pv);
         }
       });
-      var teamPar = countedRounds > 0 ? countedStrokes - (countedRounds * 72) : null;
-      var teamParCount = countedRounds;
+      parValues.sort(function(a,b){return a-b;});
+      var best4Par = parValues.slice(0, 4);
+      var teamPar = best4Par.length > 0 ? best4Par.reduce(function(a,b){return a+b;}, 0) : null;
+      var teamParCount = best4Par.length;
       var teamParStr = teamPar === null ? null : (teamPar === 0 ? 'E' : (teamPar > 0 ? '+' + teamPar : '' + teamPar));
       return { name:entry.name, picks:pickData, r1r2Total:r1r2Has?r1r2Total:null, r3Total:r3Has?r3Total:null, r4Total:r4Has?r4Total:null, total:grandTotal, teamParStr:teamParStr, teamPar:teamParCount>0?teamPar:null };
   }).sort((a,b) => {
