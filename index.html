@@ -359,18 +359,27 @@ function renderPoolStandings() {
     html += '<div style="padding:8px 12px"><table class="golfer-table"><thead><tr><th class="left">Golfer</th><th>Tier</th><th>Score</th><th>R1</th><th>R2</th><th>R3</th><th>R4</th><th>Total</th></tr></thead><tbody>';
     r.picks.forEach(p => {
       const dropped = !p.advancing;
-      const cls = dropped ? "dropped" : "counting";
-      html += '<tr style="opacity:'+(dropped?'0.5':'1')+'"><td class="left" style="font-weight:'+(dropped?'400':'600')+';color:'+(dropped?'rgba(250,246,237,0.25)':'var(--gold-light)')+';font-style:'+(p.isMC?'italic':'normal')+'">'+p.player+(p.isMC&&p.advancing?' (MC)':'')+(dropped?' ✂':'')+'</td>';
+      // Row is always full opacity - only R3/R4/Total dim for dropped golfers
+      html += '<tr>';
+      // Golfer name - show ✂ only for dropped
+      html += '<td class="left" style="font-weight:600;color:var(--gold-light);font-style:'+(p.isMC?'italic':'normal')+'">'+p.player+(p.isMC&&p.advancing?' (MC)':'')+(dropped?' <span style=\"color:rgba(250,246,237,0.3);font-size:10px\">✂</span>':'')+'</td>';
+      // Tier
       html += '<td style="color:rgba(250,246,237,0.35);font-size:11px">T'+p.tier+'</td>';
+      // Score (to par) - always show
       var parClr = !p.toParStr||p.toParStr==='—'?'rgba(250,246,237,0.5)':p.toParStr==='MC'?'rgba(250,246,237,0.3)':p.toParStr==='E'?'var(--cream)':p.toParStr.startsWith('-')?'#2ecc71':'#e67e22';
-      html += '<td style="font-size:11px;font-weight:600;color:'+parClr+'">'+(dropped?'—':(p.toParStr||'—'))+'</td>';
+      html += '<td style="font-size:11px;font-weight:600;color:'+parClr+'">'+(p.toParStr||'—')+'</td>';
+      // R1 - show for all, strikethrough if not in best 4
       var r1Drop = p.r1 !== null && !p.r1Counting;
+      html += '<td class="'+(r1Drop?'dropped':'counting')+'" style="'+(r1Drop?'text-decoration:line-through;opacity:0.5':'')+'">'+( p.r1!==null?p.r1:"—")+'</td>';
+      // R2 - show for all, strikethrough if not in best 4
       var r2Drop = p.r2 !== null && !p.r2Counting;
-      html += '<td class="'+(r1Drop?'dropped':'counting')+'" style="'+(r1Drop?'text-decoration:line-through;opacity:0.5':'')+'">'+(p.r1!==null?p.r1:"—")+'</td>';
-      html += '<td class="'+(r2Drop?'dropped':'counting')+'" style="'+(r2Drop?'text-decoration:line-through;opacity:0.5':'')+'">'+(p.r2!==null?p.r2:"—")+'</td>';
-      html += '<td class="'+(dropped?'dropped':'counting')+'">'+(dropped?"—":(p.r3!==null?p.r3:"—"))+'</td>';
-      html += '<td class="'+(dropped?'dropped':'counting')+'">'+(dropped?"—":(p.r4!==null?p.r4:"—"))+'</td>';
-      html += '<td style="font-weight:700;color:'+(dropped?'rgba(250,246,237,0.25)':'var(--gold)')+'">'+(dropped?"—":(p.total!==null?p.total:"—"))+'</td></tr>';
+      html += '<td class="'+(r2Drop?'dropped':'counting')+'" style="'+(r2Drop?'text-decoration:line-through;opacity:0.5':'')+'">'+( p.r2!==null?p.r2:"—")+'</td>';
+      // R3 - only advancing golfers
+      html += '<td style="color:'+(dropped?'rgba(250,246,237,0.15)':'var(--gold-light)')+';font-weight:'+(dropped?'400':'600')+'">'+(dropped?"—":(p.r3!==null?p.r3:"—"))+'</td>';
+      // R4 - only advancing golfers
+      html += '<td style="color:'+(dropped?'rgba(250,246,237,0.15)':'var(--gold-light)')+';font-weight:'+(dropped?'400':'600')+'">'+(dropped?"—":(p.r4!==null?p.r4:"—"))+'</td>';
+      // Total - only show for advancing golfers
+      html += '<td style="font-weight:700;color:'+(dropped?'rgba(250,246,237,0.25)':'var(--gold)')+'">'+(!dropped&&p.total!==null?p.total:"—")+'</td></tr>';
     });
     // Totals row
       var scoreTotal = 0, r1Total = 0, r2Total = 0, r3Total = 0, r4Total = 0, strokeTotal = 0;
